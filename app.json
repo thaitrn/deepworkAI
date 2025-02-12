@@ -5,6 +5,10 @@
       "expo-router"
     ],
     "name": "deeepworkAI",
-    "slug": "deeepworkAI"
+    "slug": "deeepworkAI",
+    "assetBundlePatterns": [
+      "**/*",
+      "assets/sounds/notification.wav"
+    ]
   }
 }
