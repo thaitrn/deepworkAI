@@ -88,4 +88,45 @@ export async function analyzeFocusPatterns(sessions: FocusSession[]): Promise<{
     recommendedDuration: 25,
     productiveStreak: Math.floor(sessions.filter(s => s.completed).length / 2),
   };
+}
+
+export class AiService {
+  private static instance: AiService;
+  private cache: Map<string, { data: any; timestamp: number }>;
+  private CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  private constructor() {
+    this.cache = new Map();
+  }
+
+  static getInstance(): AiService {
+    if (!AiService.instance) {
+      AiService.instance = new AiService();
+    }
+    return AiService.instance;
+  }
+
+  async getPrioritizedTasks(tasks: Task[], userId: string) {
+    const cacheKey = `priorities_${userId}`;
+    const cached = this.cache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+      return cached.data;
+    }
+
+    // AI processing logic here
+    const prioritized = await this.processTasksWithAI(tasks);
+    
+    this.cache.set(cacheKey, {
+      data: prioritized,
+      timestamp: Date.now(),
+    });
+
+    return prioritized;
+  }
+
+  private async processTasksWithAI(tasks: Task[]) {
+    // Implement AI logic here
+    return tasks;
+  }
 } 

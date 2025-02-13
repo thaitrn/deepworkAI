@@ -1,16 +1,25 @@
-export type Task = {
+// Core type definitions
+export interface User {
   id: string;
+  email: string;
+  settings: UserSettings;
+  createdAt: Date;
+  lastLogin: Date;
+}
+
+export interface Task {
+  id: string;
+  userId: string;
   title: string;
   description?: string;
   status: 'pending' | 'in_progress' | 'completed';
   priority: number;
-  due_date?: Date;
-  created_at: Date;
-  updated_at: Date;
-  user_id: string;
-  project_id?: string;
-  tags?: string[];
-};
+  dueDate?: Date;
+  projectId?: string;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export type Project = {
   id: string;
