@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
-import { FlatList, ListRenderItem } from 'react-native';
-import { Task } from '../types';
+import { FlatList, ListRenderItem, View } from 'react-native';
+import { Text } from 'react-native-paper';
+import { Task } from '@/types';
 import { TaskItem } from './TaskItem';
 
 interface Props {
@@ -15,6 +16,10 @@ const TaskList = memo(({ tasks, onTaskPress, onLoadMore, hasMore }: Props) => {
     <TaskItem task={item} onPress={() => onTaskPress(item)} />
   );
 
+  if (!tasks.length) {
+    return null;
+  }
+
   return (
     <FlatList
       data={tasks}
@@ -25,6 +30,7 @@ const TaskList = memo(({ tasks, onTaskPress, onLoadMore, hasMore }: Props) => {
       initialNumToRender={10}
       maxToRenderPerBatch={10}
       windowSize={5}
+      contentContainerStyle={{ paddingBottom: 16 }}
     />
   );
 });

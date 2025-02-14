@@ -1,299 +1,319 @@
-import { useState, useEffect } from 'react';
-import { View } from 'react-native';
-import { Text, Button, ProgressBar, Portal, Dialog, ActivityIndicator, IconButton } from 'react-native-paper';
+import { View, BackHandler, StatusBar } from 'react-native';
+import { Text, Button, Portal, Dialog, useTheme, IconButton, SegmentedButtons } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState, useEffect, useCallback } from 'react';
+import { getTask } from '@/services/tasks';
 import { Task } from '@/types';
-import { getTasks, updateTask } from '@/services/tasks';
-import { createFocusSession, updateFocusSession } from '@/services/focus';
-import { useAuth } from '@/contexts/auth';
-import FocusSettings from '@/components/FocusSettings';
-import { playNotification, cleanupSound } from '@/utils/sound';
-import BreakTimer from '@/components/BreakTimer';
-import SessionNotes from '@/components/SessionNotes';
-import SoundscapeSelector from '@/components/SoundscapeSelector';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
+
+// Timer durations in minutes
+const DURATIONS = {
+  short: { focus: 15, break: 3 },
+  medium: { focus: 25, break: 5 },
+  long: { focus: 45, break: 10 },
+};
+
+type DurationType = keyof typeof DURATIONS;
 
 export default function FocusScreen() {
-  const { session } = useAuth();
-  const router = useRouter();
   const { taskId } = useLocalSearchParams();
   const [task, setTask] = useState<Task | null>(null);
-  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
-  const [isActive, setIsActive] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [showBreakDialog, setShowBreakDialog] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [duration, setDuration] = useState(25 * 60); // 25 minutes default
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [showBreakTimer, setShowBreakTimer] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
-  const [showSoundscapes, setShowSoundscapes] = useState(false);
-  const [sessionNotes, setSessionNotes] = useState('');
+  const [durationType, setDurationType] = useState<DurationType>('medium');
+  const [timeLeft, setTimeLeft] = useState(DURATIONS.medium.focus * 60);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isBreak, setIsBreak] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [completedSessions, setCompletedSessions] = useState(0);
+  const router = useRouter();
+  const theme = useTheme();
 
   useEffect(() => {
-    console.log('Focus screen mounted with taskId:', taskId);
-  }, []);
-
-  useEffect(() => {
-    loadTask();
+    if (taskId) {
+      loadTask();
+    }
   }, [taskId]);
 
   const loadTask = async () => {
-    console.log('Loading task with ID:', taskId);
-    if (!taskId || !session) {
-      setError('Invalid task or session');
-      setLoading(false);
-      return;
-    }
-
     try {
-      setLoading(true);
-      const tasks = await getTasks(session.user.id);
-      const foundTask = tasks.find(t => t.id === taskId);
-      
-      if (!foundTask) {
-        setError('Task not found');
-        return;
-      }
-
-      setTask(foundTask);
+      const taskData = await getTask(taskId as string);
+      setTask(taskData);
     } catch (error) {
       console.error('Error loading task:', error);
-      setError('Failed to load task');
-    } finally {
-      setLoading(false);
     }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const startSession = async () => {
-    if (!task) return;
-    
-    try {
-      const focusSession = await createFocusSession({
-        user_id: session!.user.id,
-        task_id: task.id,
-        start_time: new Date(),
-        duration: timeLeft,
-        completed: false,
-      });
-      setSessionId(focusSession.id);
-      setIsActive(true);
-    } catch (error) {
-      console.error('Error starting session:', error);
-    }
-  };
-
-  const pauseSession = () => {
-    setIsActive(false);
-  };
-
-  const resumeSession = () => {
-    setIsActive(true);
-  };
-
-  const completeSession = async () => {
-    if (!task || !sessionId) return;
-
-    try {
-      await updateFocusSession(sessionId, {
-        completed: true,
-        end_time: new Date(),
-        notes: sessionNotes,
-      });
-
-      if (timeLeft === 0) {
-        await updateTask(task.id, {
-          status: 'completed',
-        });
-        if (soundEnabled) {
-          await playNotification();
-        }
-        setShowBreakTimer(true);
-      }
-    } catch (error) {
-      console.error('Error completing session:', error);
-    }
-  };
-
-  const handleBreakComplete = () => {
-    setShowBreakTimer(false);
-    router.replace('/(app)/dashboard');
   };
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-
-    if (isActive && timeLeft > 0) {
+    if (isRunning && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft((time) => {
-          if (time <= 1) {
-            clearInterval(interval);
-            setIsActive(false);
-            completeSession();
-            return 0;
-          }
-          return time - 1;
-        });
+        setTimeLeft((prev) => prev - 1);
       }, 1000);
+    } else if (timeLeft === 0) {
+      handleSessionComplete();
     }
-
     return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
+  }, [isRunning, timeLeft]);
 
-  useEffect(() => {
-    return () => {
-      cleanupSound();
-    };
-  }, []);
+  const handleDurationChange = (type: DurationType) => {
+    setDurationType(type);
+    setTimeLeft(DURATIONS[type][isBreak ? 'break' : 'focus'] * 60);
+    setIsRunning(false);
+  };
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
+  const handleSessionComplete = () => {
+    if (!isBreak) {
+      setCompletedSessions(prev => prev + 1);
+      setIsBreak(true);
+      setTimeLeft(DURATIONS[durationType].break * 60);
+    } else {
+      setIsBreak(false);
+      setTimeLeft(DURATIONS[durationType].focus * 60);
+    }
+    setIsRunning(false);
+  };
 
-  if (error || !task) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-        <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 16 }}>
-          {error || 'No task selected'}
-        </Text>
-        <Button mode="contained" onPress={() => router.back()}>
-          Go Back
-        </Button>
-      </View>
-    );
-  }
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartPause = () => {
+    setIsRunning(!isRunning);
+  };
+
+  const handleReset = () => {
+    setTimeLeft(DURATIONS[durationType][isBreak ? 'break' : 'focus'] * 60);
+    setIsRunning(false);
+  };
+
+  const handleExit = () => {
+    setShowExitDialog(true);
+  };
+
+  // Handle back button
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (isRunning) {
+          setShowExitDialog(true);
+          return true;
+        }
+        return false;
+      };
+
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }, [isRunning])
+  );
 
   return (
-    <View style={{ flex: 1, padding: 16, justifyContent: 'center' }}>
-      <View style={{ position: 'absolute', top: 16, right: 16 }}>
-        <IconButton
-          icon="cog"
-          onPress={() => setShowSettings(true)}
-        />
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <StatusBar backgroundColor={theme.colors.primary} barStyle="light-content" />
+      
+      {/* Header */}
+      <View 
+        style={{ 
+          backgroundColor: theme.colors.primary,
+          paddingTop: StatusBar.currentHeight,
+          paddingBottom: 16,
+          paddingHorizontal: 16,
+        }}
+      >
+        <View style={{ 
+          flexDirection: 'row', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+        }}>
+          <IconButton 
+            icon="arrow-left" 
+            iconColor="white"
+            onPress={() => {
+              if (isRunning) {
+                setShowExitDialog(true);
+              } else {
+                router.back();
+              }
+            }}
+          />
+          <Text variant="titleLarge" style={{ color: 'white' }}>Focus Mode</Text>
+          <IconButton 
+            icon="cog" 
+            iconColor="white"
+            onPress={() => setShowSettingsDialog(true)}
+          />
+        </View>
       </View>
 
-      <Text variant="headlineMedium" style={{ textAlign: 'center', marginBottom: 24 }}>
-        Focus Mode
-      </Text>
+      {/* Main Content */}
+      <View style={{ flex: 1, padding: 16 }}>
+        <Animated.View 
+          entering={FadeInDown.delay(100)}
+          style={{ alignItems: 'center', marginTop: 32 }}
+        >
+          {task && (
+            <Text variant="headlineSmall" style={{ marginBottom: 8, textAlign: 'center' }}>
+              {task.title}
+            </Text>
+          )}
+          <Text 
+            variant="titleMedium" 
+            style={{ 
+              color: theme.colors.primary,
+              marginBottom: 32,
+              backgroundColor: theme.colors.primaryContainer,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 16,
+            }}
+          >
+            {isBreak ? 'Break Time' : 'Focus Time'}
+          </Text>
+        </Animated.View>
 
-      <Text variant="titleMedium" style={{ textAlign: 'center', marginBottom: 8 }}>
-        Current Task: {task.title}
-      </Text>
+        <Animated.View 
+          entering={FadeInDown.delay(200)}
+          style={{ alignItems: 'center' }}
+        >
+          <View
+            style={{
+              width: 280,
+              height: 280,
+              borderRadius: 140,
+              borderWidth: 12,
+              borderColor: theme.colors.primary,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 32,
+              backgroundColor: theme.colors.primaryContainer,
+            }}
+          >
+            <Text style={{ 
+              fontSize: 56, 
+              fontWeight: 'bold',
+              color: theme.colors.primary,
+            }}>
+              {formatTime(timeLeft)}
+            </Text>
+            <Text style={{ 
+              color: theme.colors.primary,
+              marginTop: 8,
+            }}>
+              {isBreak ? 'Break' : 'Focus'}
+            </Text>
+          </View>
 
-      <Text variant="displayLarge" style={{ textAlign: 'center', marginVertical: 32 }}>
-        {formatTime(timeLeft)}
-      </Text>
+          <View style={{ 
+            backgroundColor: theme.colors.primaryContainer,
+            padding: 16,
+            borderRadius: 16,
+            marginBottom: 32,
+          }}>
+            <Text variant="titleMedium" style={{ textAlign: 'center' }}>
+              Completed Sessions: {completedSessions}
+            </Text>
+          </View>
+        </Animated.View>
 
-      <ProgressBar
-        progress={1 - timeLeft / (25 * 60)}
-        style={{ height: 8, marginBottom: 32 }}
-      />
+        <View style={{ flex: 1 }} />
 
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16 }}>
-        {!isActive ? (
+        <Animated.View 
+          entering={FadeInDown.delay(300)}
+          style={{ gap: 16 }}
+        >
           <Button
             mode="contained"
-            onPress={sessionId ? resumeSession : startSession}
-            style={{ minWidth: 120 }}
+            onPress={handleStartPause}
+            style={{ borderRadius: 28 }}
+            contentStyle={{ height: 56 }}
           >
-            {sessionId ? 'Resume' : 'Start'}
+            {isRunning ? 'Pause' : 'Start'}
           </Button>
-        ) : (
-          <Button
-            mode="contained"
-            onPress={pauseSession}
-            style={{ minWidth: 120 }}
-          >
-            Pause
-          </Button>
-        )}
 
-        <Button
-          mode="outlined"
-          onPress={completeSession}
-          style={{ minWidth: 120 }}
-        >
-          Complete
-        </Button>
-      </View>
-
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 16 }}>
-        <Button
-          mode="text"
-          onPress={() => setShowNotes(true)}
-          icon="pencil"
-        >
-          Notes
-        </Button>
-        <Button
-          mode="text"
-          onPress={() => setShowSoundscapes(true)}
-          icon="music"
-        >
-          Sounds
-        </Button>
+          <View style={{ flexDirection: 'row', gap: 16 }}>
+            <Button
+              mode="outlined"
+              onPress={handleReset}
+              style={{ flex: 1, borderRadius: 28 }}
+              contentStyle={{ height: 56 }}
+            >
+              Reset
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={handleExit}
+              style={{ flex: 1, borderRadius: 28 }}
+              contentStyle={{ height: 56 }}
+            >
+              Exit
+            </Button>
+          </View>
+        </Animated.View>
       </View>
 
       <Portal>
-        <Dialog visible={showBreakDialog} onDismiss={handleBreakComplete}>
-          <Dialog.Title>Great Work!</Dialog.Title>
+        <Dialog visible={showExitDialog} onDismiss={() => setShowExitDialog(false)}>
+          <Dialog.Title>Exit Focus Mode?</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium">
-              You've completed your focus session. Take a 5-minute break to:
-            </Text>
-            <Text variant="bodyMedium" style={{ marginTop: 8 }}>
-              • Stand up and stretch{'\n'}
-              • Drink some water{'\n'}
-              • Rest your eyes{'\n'}
-              • Take deep breaths
+              {isRunning 
+                ? 'Timer is still running. Are you sure you want to exit?' 
+                : 'Are you sure you want to exit focus mode?'}
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={handleBreakComplete}>Done</Button>
+            <Button onPress={() => setShowExitDialog(false)}>Cancel</Button>
+            <Button onPress={() => router.back()}>Exit</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={showSettingsDialog} onDismiss={() => setShowSettingsDialog(false)}>
+          <Dialog.Title>Timer Settings</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={{ marginBottom: 16 }}>
+              Choose Timer Duration
+            </Text>
+            <SegmentedButtons
+              value={durationType}
+              onValueChange={value => handleDurationChange(value as DurationType)}
+              buttons={[
+                {
+                  value: 'short',
+                  label: 'Short',
+                  icon: 'timer-outline',
+                  checkedColor: theme.colors.primary,
+                },
+                {
+                  value: 'medium',
+                  label: 'Medium',
+                  icon: 'timer',
+                  checkedColor: theme.colors.primary,
+                },
+                {
+                  value: 'long',
+                  label: 'Long',
+                  icon: 'timer-sand',
+                  checkedColor: theme.colors.primary,
+                },
+              ]}
+            />
+            <View style={{ marginTop: 16 }}>
+              <Text variant="bodyMedium" style={{ marginBottom: 8 }}>
+                Duration Details:
+              </Text>
+              <Text style={{ color: '#666' }}>
+                Focus: {DURATIONS[durationType].focus} minutes{'\n'}
+                Break: {DURATIONS[durationType].break} minutes
+              </Text>
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowSettingsDialog(false)}>Done</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
-
-      <FocusSettings
-        visible={showSettings}
-        onDismiss={() => setShowSettings(false)}
-        duration={duration}
-        onDurationChange={(newDuration) => {
-          setDuration(newDuration);
-          setTimeLeft(newDuration);
-        }}
-        soundEnabled={soundEnabled}
-        onSoundEnabledChange={setSoundEnabled}
-      />
-
-      <BreakTimer
-        visible={showBreakTimer}
-        onComplete={handleBreakComplete}
-        soundEnabled={soundEnabled}
-      />
-
-      <SessionNotes
-        visible={showNotes}
-        onDismiss={() => setShowNotes(false)}
-        onSave={setSessionNotes}
-        initialNotes={sessionNotes}
-      />
-
-      <SoundscapeSelector
-        visible={showSoundscapes}
-        onDismiss={() => setShowSoundscapes(false)}
-      />
     </View>
   );
 } 

@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/contexts/auth';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { verifyDatabaseStructure } from '@/services/database';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -21,8 +22,16 @@ const theme = {
 
 export default function RootLayout() {
   useEffect(() => {
-    // Hide splash screen when the app is ready
-    SplashScreen.hideAsync();
+    const init = async () => {
+      try {
+        await verifyDatabaseStructure();
+        await SplashScreen.hideAsync();
+      } catch (error) {
+        console.error('Initialization error:', error);
+      }
+    };
+    
+    init();
   }, []);
 
   return (

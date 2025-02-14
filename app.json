@@ -2,7 +2,13 @@
   "expo": {
     "scheme": "acme",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "@react-native-community/datetimepicker",
+        {
+          "androidPackage": "com.reactcommunity.rndatetimepicker"
+        }
+      ]
     ],
     "name": "deeepworkAI",
     "slug": "deeepworkAI",

@@ -9,16 +9,14 @@ export interface User {
 
 export interface Task {
   id: string;
-  userId: string;
   title: string;
   description?: string;
   status: 'pending' | 'in_progress' | 'completed';
   priority: number;
-  dueDate?: Date;
-  projectId?: string;
-  tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  deadline?: string | null;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export type Project = {
@@ -39,4 +37,15 @@ export type FocusSession = {
   duration?: number;
   completed: boolean;
   notes?: string;
-}; 
+};
+
+export class TaskError extends Error {
+  constructor(
+    message: string,
+    public code: 'VALIDATION' | 'DATABASE' | 'NETWORK' | 'UNKNOWN',
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'TaskError';
+  }
+} 

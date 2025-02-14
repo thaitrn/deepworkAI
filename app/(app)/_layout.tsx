@@ -1,21 +1,9 @@
-import { useEffect } from 'react';
-import { Stack, useRouter } from 'expo-router';
-import { Button, IconButton } from 'react-native-paper';
+import { Stack } from 'expo-router';
+import { Button } from 'react-native-paper';
 import { useAuth } from '@/contexts/auth';
 
 export default function AppLayout() {
-  const { session, loading, signOut } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && !session) {
-      router.replace('/(auth)/login');
-    }
-  }, [session, loading]);
-
-  if (loading || !session) {
-    return null;
-  }
+  const { signOut } = useAuth();
 
   return (
     <Stack
@@ -27,48 +15,38 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen
-        name="dashboard"
+        name="index"
         options={{
           title: 'Dashboard',
           headerRight: () => (
-            <Button 
-              textColor="white"
-              onPress={async () => {
-                await signOut();
-                router.replace('/(auth)/login');
-              }}
-            >
+            <Button textColor="white" onPress={signOut}>
               Logout
             </Button>
           ),
         }}
       />
       <Stack.Screen
+        name="tasks/new"
+        options={{
+          title: 'New Task',
+        }}
+      />
+      <Stack.Screen
+        name="tasks/[id]"
+        options={{
+          title: 'Task Details',
+        }}
+      />
+      <Stack.Screen
+        name="tasks/edit"
+        options={{
+          title: 'Edit Task',
+        }}
+      />
+      <Stack.Screen
         name="focus/index"
         options={{
           title: 'Focus Mode',
-          presentation: 'modal',
-        }}
-      />
-      <Stack.Screen
-        name="stats"
-        options={{
-          title: 'Statistics',
-        }}
-      />
-      <Stack.Screen
-        name="chat"
-        options={{
-          title: 'AI Assistant',
-          headerRight: () => (
-            <IconButton
-              icon="information"
-              iconColor="white"
-              onPress={() => {
-                // TODO: Show AI capabilities info
-              }}
-            />
-          ),
         }}
       />
     </Stack>

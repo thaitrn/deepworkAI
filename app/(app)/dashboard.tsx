@@ -2,7 +2,7 @@ import { View, ScrollView } from 'react-native';
 import { Text, FAB, Card, ActivityIndicator, IconButton, Button } from 'react-native-paper';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth';
-import { Task, FocusSession } from '@/types';
+import { Task, FocusSession, TaskError } from '@/types';
 import { getTasks, createTask, updateTask, deleteTask } from '@/services/tasks';
 import TaskModal from '@/components/TaskModal';
 import { useRouter } from 'expo-router';
@@ -25,11 +25,33 @@ export default function Dashboard() {
 
   const loadTasks = async () => {
     try {
-      const data = await getTasks(session!.user.id);
+      setLoading(true);
+      if (!session?.user?.id) {
+        throw new Error('No user session found');
+      }
+      const data = await getTasks(session.user.id);
       setTasks(data);
     } catch (error) {
       console.error('Error loading tasks:', error);
-      // TODO: Show error message
+      if (error instanceof TaskError) {
+        switch (error.code) {
+          case 'DATABASE':
+            // Handle database errors
+            console.error('Database error:', error.details);
+            break;
+          case 'NETWORK':
+            // Handle network errors
+            console.error('Network error:', error.details);
+            break;
+          case 'VALIDATION':
+            // Handle validation errors
+            console.error('Validation error:', error.details);
+            break;
+          default:
+            // Handle other errors
+            console.error('Unknown error:', error);
+        }
+      }
     } finally {
       setLoading(false);
     }
