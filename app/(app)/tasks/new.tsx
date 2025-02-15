@@ -1,6 +1,6 @@
-import { View, Platform } from 'react-native';
+import { View, Platform, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { Text, TextInput, Button, useTheme, Portal, Modal } from 'react-native-paper';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { createTask } from '@/services/tasks';
 import { useRouter } from 'expo-router';
@@ -19,6 +19,7 @@ export default function NewTaskScreen() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const router = useRouter();
   const theme = useTheme();
+  const descriptionRef = useRef<TextInput>(null);
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -72,131 +73,129 @@ export default function NewTaskScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'white', padding: 16 }}>
-      <Animated.View 
-        entering={FadeIn}
-        style={{ padding: 16, flex: 1 }}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <Animated.View entering={FadeInDown.delay(100)}>
-          <TextInput
-            placeholder="Title"
-            value={title}
-            onChangeText={(text) => {
-              setTitle(text);
-              if (errors.title) {
-                setErrors(prev => ({ ...prev, title: '' }));
-              }
-            }}
-            style={{
-              backgroundColor: 'transparent',
-              fontSize: 16,
-              paddingHorizontal: 0,
-              marginBottom: 4,
-            }}
-            underlineColor="transparent"
-            activeUnderlineColor={theme.colors.primary}
-            error={!!errors.title}
-          />
-          {errors.title && (
-            <Text style={{ color: theme.colors.error, fontSize: 12, marginBottom: 12 }}>
-              {errors.title}
-            </Text>
-          )}
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(200)}>
-          <TextInput
-            placeholder="Description"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            style={{
-              backgroundColor: 'transparent',
-              fontSize: 16,
-              paddingHorizontal: 0,
-              marginBottom: 24,
-              minHeight: 80,
-            }}
-            underlineColor="transparent"
-            activeUnderlineColor={theme.colors.primary}
-            error={!!errors.description}
-          />
-          {errors.description && (
-            <Text style={{ color: theme.colors.error, fontSize: 12, marginBottom: 12 }}>
-              {errors.description}
-            </Text>
-          )}
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(300)}>
-          <Text style={{ marginBottom: 8, color: '#666' }}>Priority</Text>
-          <View style={{ 
-            flexDirection: 'row',
-            backgroundColor: '#f0f0f0',
-            borderRadius: 28,
-            padding: 4,
-            marginBottom: 24,
-          }}>
-            {(['low', 'medium', 'high'] as const).map((p) => (
-              <Button
-                key={p}
-                mode={priority === p ? 'contained' : 'text'}
-                onPress={() => setPriority(p)}
-                style={{
-                  flex: 1,
-                  borderRadius: 24,
-                  marginHorizontal: 2,
-                }}
-                contentStyle={{ height: 40 }}
-                labelStyle={{ fontSize: 14 }}
-                buttonColor={priority === p ? (
-                  p === 'high' ? '#ef5350' :
-                  p === 'medium' ? '#fb8c00' :
-                  '#66bb6a'
-                ) : undefined}
-              >
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </Button>
-            ))}
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(400)}>
-          <DeadlinePicker
-            value={deadline}
-            onChange={setDeadline}
-            format="long"
-            includeTime={true}
-            minDate={new Date()}
-            maxDate={new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)} // 90 days from now
-          />
-        </Animated.View>
-
-        <View style={{ flex: 1 }} />
-
-        {errors.submit && (
-          <Text style={{ color: theme.colors.error, textAlign: 'center', marginBottom: 8 }}>
-            {errors.submit}
-          </Text>
-        )}
-
-        <Animated.View entering={FadeInDown.delay(500)}>
-          <Button
-            mode="contained"
-            onPress={handleSave}
-            loading={loading}
-            disabled={!title.trim() || loading}
-            style={{
-              borderRadius: 28,
-              marginBottom: 16,
-              backgroundColor: theme.colors.primary,
-            }}
-            contentStyle={{ height: 56 }}
+        <View style={{ flex: 1, backgroundColor: 'white', padding: 16 }}>
+          <Animated.View 
+            entering={FadeIn}
+            style={{ padding: 16, flex: 1 }}
           >
-            Save Task
-          </Button>
-        </Animated.View>
-      </Animated.View>
-    </View>
+            <Animated.View entering={FadeInDown.delay(100)}>
+              <TextInput
+                mode="outlined"
+                label="Title"
+                value={title}
+                onChangeText={setTitle}
+                error={!!errors.title}
+                autoFocus={true}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => {
+                  // Focus description input
+                  descriptionRef.current?.focus();
+                }}
+                style={{ marginBottom: errors.title ? 4 : 12 }}
+              />
+              {errors.title && (
+                <Text style={{ color: theme.colors.error, fontSize: 12, marginBottom: 12 }}>
+                  {errors.title}
+                </Text>
+              )}
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(200)}>
+              <TextInput
+                ref={descriptionRef}
+                mode="outlined"
+                label="Description"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
+                style={{ marginBottom: errors.description ? 4 : 12 }}
+              />
+              {errors.description && (
+                <Text style={{ color: theme.colors.error, fontSize: 12, marginBottom: 12 }}>
+                  {errors.description}
+                </Text>
+              )}
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(300)}>
+              <Text style={{ marginBottom: 8, color: '#666' }}>Priority</Text>
+              <View style={{ 
+                flexDirection: 'row',
+                backgroundColor: '#f0f0f0',
+                borderRadius: 28,
+                padding: 4,
+                marginBottom: 24,
+              }}>
+                {(['low', 'medium', 'high'] as const).map((p) => (
+                  <Button
+                    key={p}
+                    mode={priority === p ? 'contained' : 'text'}
+                    onPress={() => setPriority(p)}
+                    style={{
+                      flex: 1,
+                      borderRadius: 24,
+                      marginHorizontal: 2,
+                    }}
+                    contentStyle={{ height: 40 }}
+                    labelStyle={{ fontSize: 14 }}
+                    buttonColor={priority === p ? (
+                      p === 'high' ? '#ef5350' :
+                      p === 'medium' ? '#fb8c00' :
+                      '#66bb6a'
+                    ) : undefined}
+                  >
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </Button>
+                ))}
+              </View>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(400)}>
+              <DeadlinePicker
+                value={deadline}
+                onChange={setDeadline}
+                format="long"
+                includeTime={true}
+                minDate={new Date()}
+                maxDate={new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)} // 90 days from now
+              />
+            </Animated.View>
+
+            <View style={{ flex: 1 }} />
+
+            {errors.submit && (
+              <Text style={{ color: theme.colors.error, textAlign: 'center', marginBottom: 8 }}>
+                {errors.submit}
+              </Text>
+            )}
+
+            <Animated.View entering={FadeInDown.delay(500)}>
+              <Button
+                mode="contained"
+                onPress={handleSave}
+                loading={loading}
+                disabled={!title.trim() || loading}
+                style={{
+                  borderRadius: 28,
+                  marginBottom: 16,
+                  backgroundColor: theme.colors.primary,
+                }}
+                contentStyle={{ height: 56 }}
+              >
+                Save Task
+              </Button>
+            </Animated.View>
+          </Animated.View>
+        </View>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 } 

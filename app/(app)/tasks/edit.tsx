@@ -1,7 +1,7 @@
-import { View, Platform } from 'react-native';
+import { View, Platform, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { Text, TextInput, Button, useTheme, Portal, Snackbar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { getTask, updateTask } from '@/services/tasks';
 import { Task } from '@/types';
@@ -23,6 +23,7 @@ export default function EditTaskScreen() {
   const [success, setSuccess] = useState('');
   const router = useRouter();
   const theme = useTheme();
+  const descriptionRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (id) {
@@ -47,6 +48,7 @@ export default function EditTaskScreen() {
   };
 
   const handleSave = async () => {
+    Keyboard.dismiss();
     if (!task) return;
     try {
       setSaving(true);
@@ -93,99 +95,116 @@ export default function EditTaskScreen() {
   }
 
   return (
-    <>
-      <View style={{ flex: 1, backgroundColor: 'white', padding: 16 }}>
-        <Animated.View entering={FadeIn}>
-          <TextInput
-            label="Title"
-            value={title}
-            onChangeText={setTitle}
-            style={{ marginBottom: 16, backgroundColor: 'transparent' }}
-          />
-        </Animated.View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={{ flex: 1, backgroundColor: 'white', padding: 16 }}>
+          <Animated.View entering={FadeIn}>
+            <TextInput
+              mode="outlined"
+              label="Title"
+              value={title}
+              onChangeText={setTitle}
+              error={!!error}
+              autoFocus={true}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => {
+                // Focus description input
+                descriptionRef.current?.focus();
+              }}
+              style={{ marginBottom: error ? 4 : 12 }}
+            />
+          </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(100)}>
-          <TextInput
-            label="Description"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-            style={{ marginBottom: 24, backgroundColor: 'transparent' }}
-          />
+          <Animated.View entering={FadeInDown.delay(100)}>
+            <TextInput
+              ref={descriptionRef}
+              mode="outlined"
+              label="Description"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+              style={{ marginBottom: 24 }}
+            />
 
-          <Text style={{ marginBottom: 8, color: '#666' }}>Priority</Text>
-          <View style={{ 
-            flexDirection: 'row',
-            backgroundColor: '#f0f0f0',
-            borderRadius: 28,
-            padding: 4,
-            marginBottom: 24,
-          }}>
-            {(['low', 'medium', 'high'] as const).map((p) => (
-              <Button
-                key={p}
-                mode={priority === p ? 'contained' : 'text'}
-                onPress={() => setPriority(p)}
-                style={{
-                  flex: 1,
-                  borderRadius: 24,
-                  marginHorizontal: 2,
-                }}
-                contentStyle={{ height: 40 }}
-                labelStyle={{ fontSize: 14 }}
-              >
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </Button>
-            ))}
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(200)}>
-          <DeadlinePicker
-            value={deadline}
-            onChange={setDeadline}
-          />
-        </Animated.View>
-
-        <View style={{ flex: 1 }} />
-
-        <Animated.View entering={FadeInDown.delay(300)}>
-          <Button
-            mode="contained"
-            onPress={handleSave}
-            loading={saving}
-            disabled={!title.trim() || saving}
-            style={{
+            <Text style={{ marginBottom: 8, color: '#666' }}>Priority</Text>
+            <View style={{ 
+              flexDirection: 'row',
+              backgroundColor: '#f0f0f0',
               borderRadius: 28,
-              marginBottom: 16,
-            }}
-            contentStyle={{ height: 56 }}
+              padding: 4,
+              marginBottom: 24,
+            }}>
+              {(['low', 'medium', 'high'] as const).map((p) => (
+                <Button
+                  key={p}
+                  mode={priority === p ? 'contained' : 'text'}
+                  onPress={() => setPriority(p)}
+                  style={{
+                    flex: 1,
+                    borderRadius: 24,
+                    marginHorizontal: 2,
+                  }}
+                  contentStyle={{ height: 40 }}
+                  labelStyle={{ fontSize: 14 }}
+                >
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </Button>
+              ))}
+            </View>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(200)}>
+            <DeadlinePicker
+              value={deadline}
+              onChange={setDeadline}
+            />
+          </Animated.View>
+
+          <View style={{ flex: 1 }} />
+
+          <Animated.View entering={FadeInDown.delay(300)}>
+            <Button
+              mode="contained"
+              onPress={handleSave}
+              loading={saving}
+              disabled={!title.trim() || saving}
+              style={{
+                borderRadius: 28,
+                marginBottom: 16,
+              }}
+              contentStyle={{ height: 56 }}
+            >
+              Save Changes
+            </Button>
+          </Animated.View>
+        </View>
+
+        <Portal>
+          <Snackbar
+            visible={!!error}
+            onDismiss={() => setError('')}
+            duration={3000}
+            style={{ backgroundColor: theme.colors.error }}
           >
-            Save Changes
-          </Button>
-        </Animated.View>
-      </View>
+            {error}
+          </Snackbar>
 
-      <Portal>
-        <Snackbar
-          visible={!!error}
-          onDismiss={() => setError('')}
-          duration={3000}
-          style={{ backgroundColor: theme.colors.error }}
-        >
-          {error}
-        </Snackbar>
-
-        <Snackbar
-          visible={!!success}
-          onDismiss={() => setSuccess('')}
-          duration={3000}
-          style={{ backgroundColor: theme.colors.primary }}
-        >
-          {success}
-        </Snackbar>
-      </Portal>
-    </>
+          <Snackbar
+            visible={!!success}
+            onDismiss={() => setSuccess('')}
+            duration={3000}
+            style={{ backgroundColor: theme.colors.primary }}
+          >
+            {success}
+          </Snackbar>
+        </Portal>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 } 
