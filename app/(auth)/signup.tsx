@@ -6,16 +6,16 @@ import { useAuth } from '@/contexts/auth';
 import { Input } from '@/components/Input';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
-export default function LoginScreen() {
+export default function SignUpScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
+  const handleSignUp = async () => {
     if (!email || !password) {
       setError('Please fill in all fields');
       return;
@@ -23,9 +23,8 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-      setError('');
-      await signIn(email, password);
-      router.replace('/(app)/dashboard');
+      await signUp(email, password);
+      router.replace('/(auth)/login');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -47,7 +46,7 @@ export default function LoginScreen() {
             justifyContent: 'center',
           }}
         >
-          <Link href="/" style={{ marginBottom: 32 }}>
+          <Link href="/(auth)/login" style={{ marginBottom: 32 }}>
             <Text 
               style={{ 
                 color: theme.colors.primary,
@@ -65,7 +64,7 @@ export default function LoginScreen() {
               marginBottom: 8,
             }}
           >
-            Log in
+            Sign Up
           </Text>
           
           <Text 
@@ -75,16 +74,13 @@ export default function LoginScreen() {
               marginBottom: 32,
             }}
           >
-            Welcome back! Enter your details.
+            Add your email and password.
           </Text>
 
           <Input
             label="Your Email"
             value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              setError('');
-            }}
+            onChangeText={setEmail}
             keyboardType="email-address"
             returnKeyType="next"
             error={error}
@@ -93,19 +89,16 @@ export default function LoginScreen() {
           <Input
             label="Your Password"
             value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              setError('');
-            }}
+            onChangeText={setPassword}
             secureTextEntry
             returnKeyType="done"
-            onSubmitEditing={handleLogin}
+            onSubmitEditing={handleSignUp}
             error={error}
           />
 
           <Button
             mode="contained"
-            onPress={handleLogin}
+            onPress={handleSignUp}
             loading={loading}
             style={{ 
               marginTop: 16,
@@ -117,14 +110,14 @@ export default function LoginScreen() {
               height: 48,
             }}
           >
-            Log in
+            Sign Up
           </Button>
 
           <View style={{ marginTop: 24, alignItems: 'center' }}>
             <Text variant="bodyMedium" style={{ color: theme.colors.outline }}>
-              Don't have an account?{' '}
-              <Link href="/(auth)/signup" style={{ color: theme.colors.primary }}>
-                Sign up
+              Already have an account?{' '}
+              <Link href="/(auth)/login" style={{ color: theme.colors.primary }}>
+                Log in
               </Link>
             </Text>
           </View>

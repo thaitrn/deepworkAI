@@ -1,58 +1,40 @@
 import { Stack } from 'expo-router';
-import { Button } from 'react-native-paper';
 import { useAuth } from '@/contexts/auth';
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
 
 export default function AppLayout() {
-  const { signOut } = useAuth();
+  const { session } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!session) {
+      router.replace('/(auth)/login');
+    }
+  }, [session]);
 
   return (
     <Stack
       screenOptions={{
-        headerStyle: {
-          backgroundColor: '#6200ee',
-        },
-        headerTintColor: '#fff',
+        headerShown: false,
+        animation: 'fade',
       }}
     >
-      <Stack.Screen
-        name="dashboard"
+      <Stack.Screen name="dashboard" />
+      <Stack.Screen name="upcoming" />
+      <Stack.Screen name="search" />
+      <Stack.Screen name="menu" />
+      <Stack.Screen 
+        name="tasks/new" 
         options={{
-          title: 'Dashboard',
-          headerRight: () => (
-            <Button textColor="white" onPress={signOut}>
-              Logout
-            </Button>
-          ),
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
         }}
       />
-      <Stack.Screen
-        name="index"
+      <Stack.Screen 
+        name="tasks/[id]" 
         options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="tasks/new"
-        options={{
-          title: 'New Task',
-        }}
-      />
-      <Stack.Screen
-        name="tasks/[id]"
-        options={{
-          title: 'Task Details',
-        }}
-      />
-      <Stack.Screen
-        name="tasks/edit"
-        options={{
-          title: 'Edit Task',
-        }}
-      />
-      <Stack.Screen
-        name="focus/index"
-        options={{
-          title: 'Focus Mode',
+          animation: 'slide_from_right',
         }}
       />
     </Stack>

@@ -1,26 +1,32 @@
 {
   "expo": {
-    "scheme": "acme",
-    "plugins": [
-      "expo-router",
-      [
-        "@react-native-community/datetimepicker",
-        {
-          "androidPackage": "com.reactcommunity.rndatetimepicker"
-        }
-      ]
-    ],
     "name": "deeepworkAI",
     "slug": "deeepworkAI",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "assetBundlePatterns": [
-      "**/*",
-      "assets/sounds/notification.wav"
+      "**/*"
     ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.deeepworkAI"
+    },
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "package": "com.anonymous.deeepworkAI"
     },
-    "ios": {
-      "bundleIdentifier": "com.anonymous.deeepworkAI"
-    }
+    "plugins": [
+      "expo-router",
+      "expo-splash-screen"
+    ]
   }
 }

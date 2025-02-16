@@ -9,7 +9,7 @@ export default function AuthLayout() {
 
   useEffect(() => {
     if (session) {
-      router.replace('/(app)');
+      router.replace('/(app)/dashboard');
     }
   }, [session]);
 
@@ -18,6 +18,7 @@ export default function AuthLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: 'white' },
+        animation: 'slide_from_bottom',
       }}
     />
   );

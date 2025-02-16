@@ -3,5 +3,5 @@ import { useAuth } from '@/contexts/auth';
 
 export default function Index() {
   const { session } = useAuth();
-  return <Redirect href={session ? '/(app)' : '/(auth)/login'} />;
+  return <Redirect href={session ? '/(app)/dashboard' : '/(auth)/login'} />;
 } 

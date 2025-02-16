@@ -1,62 +1,54 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Stack } from 'expo-router';
-import { PaperProvider, MD3LightTheme } from 'react-native-paper';
+import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/contexts/auth';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { verifyDatabaseStructure } from '@/services/database';
-
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
-
-const theme = {
-  ...MD3LightTheme,
-  // You can customize your theme here
-  colors: {
-    ...MD3LightTheme.colors,
-    primary: '#6200ee',
-    secondary: '#03dac6',
-  },
-};
+import { theme } from '@/theme';
+import { View } from 'react-native';
 
 export default function RootLayout() {
+  const [appIsReady, setAppIsReady] = useState(false);
+
   useEffect(() => {
-    const init = async () => {
+    async function prepare() {
       try {
+        // Pre-load fonts, make any API calls you need to do here
         await verifyDatabaseStructure();
-        await SplashScreen.hideAsync();
-      } catch (error) {
-        console.error('Initialization error:', error);
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        // Tell the application to render
+        setAppIsReady(true);
       }
-    };
-    
-    init();
+    }
+
+    prepare();
   }, []);
+
+  if (!appIsReady) {
+    return null;
+  }
 
   return (
     <AuthProvider>
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <PaperProvider theme={theme}>
-            <Stack>
-              <Stack.Screen
-                name="(auth)"
-                options={{
-                  headerShown: false,
-                }}
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen 
+                name="(auth)" 
+                options={{ 
+                  animation: 'slide_from_bottom',
+                }} 
               />
-              <Stack.Screen
-                name="(app)"
-                options={{
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
-                name="index"
-                options={{
-                  headerShown: false,
-                }}
+              <Stack.Screen 
+                name="(app)" 
+                options={{ 
+                  animation: 'fade',
+                }} 
               />
             </Stack>
           </PaperProvider>
