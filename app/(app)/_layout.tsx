@@ -15,7 +15,7 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen
-        name="index"
+        name="dashboard"
         options={{
           title: 'Dashboard',
           headerRight: () => (
@@ -23,6 +23,12 @@ export default function AppLayout() {
               Logout
             </Button>
           ),
+        }}
+      />
+      <Stack.Screen
+        name="index"
+        options={{
+          headerShown: false,
         }}
       />
       <Stack.Screen

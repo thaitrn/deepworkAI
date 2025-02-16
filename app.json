@@ -15,6 +15,12 @@
     "assetBundlePatterns": [
       "**/*",
       "assets/sounds/notification.wav"
-    ]
+    ],
+    "android": {
+      "package": "com.anonymous.deeepworkAI"
+    },
+    "ios": {
+      "bundleIdentifier": "com.anonymous.deeepworkAI"
+    }
   }
 }
