@@ -6,6 +6,7 @@ import Animated, { FadeIn, SlideOutRight, Layout } from 'react-native-reanimated
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Confetti } from './Confetti';
+import { IconButton } from 'react-native-paper';
 
 export function TaskItem({ task, onPress, onComplete }: { 
   task: Task; 
@@ -71,51 +72,46 @@ export function TaskItem({ task, onPress, onComplete }: {
         onPress={onPress}
         style={({ pressed }) => ({
           opacity: pressed ? 0.7 : 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: 12,
+          gap: 12,
         })}
       >
-        <Surface
-          style={{
-            marginBottom: 12,
-            borderRadius: 12,
-            overflow: 'hidden',
-            borderLeftWidth: 4,
-            borderLeftColor: task.priority === 3 
-              ? theme.colors.error 
-              : task.priority === 2 
-                ? theme.colors.warning 
-                : theme.colors.success,
-          }}
-        >
-          <Card.Content>
-            <Text variant="titleMedium" style={{ marginBottom: 4 }}>{task.title}</Text>
-            {task.description && (
-              <Text variant="bodyMedium" style={{ color: '#666', marginBottom: 8 }}>
-                {task.description}
-              </Text>
-            )}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View
-                style={{
-                  backgroundColor: getPriorityColor(task.priority),
-                  paddingHorizontal: 12,
-                  paddingVertical: 4,
-                  borderRadius: 16,
-                }}
-              >
-                <Text style={{ color: '#666' }}>{getPriorityText(task.priority)}</Text>
-              </View>
-              {task.deadline && (
-                <Text 
-                  style={{ 
-                    color: new Date(task.deadline) < new Date() ? theme.colors.error : '#666'
-                  }}
-                >
-                  {getDeadlineText(task.deadline)}
-                </Text>
-              )}
-            </View>
-          </Card.Content>
-        </Surface>
+        <IconButton
+          icon={task.status === 'completed' ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+          size={24}
+          iconColor={task.status === 'completed' ? theme.colors.primary : theme.colors.outline}
+        />
+        
+        <View style={{ flex: 1 }}>
+          <Text 
+            variant="bodyLarge"
+            style={[
+              task.status === 'completed' && { 
+                textDecorationLine: 'line-through',
+                color: theme.colors.outline,
+              }
+            ]}
+          >
+            {task.title}
+          </Text>
+          
+          {task.deadline && (
+            <Text 
+              variant="bodySmall" 
+              style={{ color: theme.colors.error }}
+            >
+              {getDeadlineText(task.deadline)}
+            </Text>
+          )}
+        </View>
+
+        <IconButton
+          icon="dots-vertical"
+          size={20}
+          iconColor={theme.colors.outline}
+        />
       </Pressable>
       <Confetti isActive={showConfetti} />
     </Animated.View>

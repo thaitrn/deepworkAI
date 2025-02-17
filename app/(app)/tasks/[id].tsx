@@ -1,260 +1,147 @@
-import { View, ActivityIndicator } from 'react-native';
-import { Text, Button, useTheme, Portal, Dialog, IconButton, Snackbar } from 'react-native-paper';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/auth';
-import { getTask, updateTask, deleteTask } from '@/services/tasks';
+import { View, ScrollView } from 'react-native';
+import { Text, useTheme, Button, IconButton, Divider } from 'react-native-paper';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Task } from '@/types';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { getTask, updateTask, deleteTask } from '@/services/tasks';
+import { ScreenLayout } from '@/components/ScreenLayout';
+import { format } from 'date-fns';
 
-export default function TaskDetailsScreen() {
-  const { id } = useLocalSearchParams();
-  const { session } = useAuth();
+export default function TaskDetailScreen() {
+  const theme = useTheme();
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const router = useRouter();
-  const theme = useTheme();
 
   useEffect(() => {
+    const loadTask = async () => {
+      try {
+        const fetchedTask = await getTask(id);
+        setTask(fetchedTask);
+      } catch (error) {
+        console.error('Error loading task:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadTask();
   }, [id]);
 
-  // Refresh data when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      loadTask();
-    }, [id])
-  );
-
-  const loadTask = async () => {
-    try {
-      const taskData = await getTask(id as string);
-      setTask(taskData);
-    } catch (error) {
-      console.error('Error loading task:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMarkComplete = async () => {
+  const handleComplete = useCallback(async () => {
     if (!task) return;
     try {
-      await updateTask(task.id, { ...task, status: 'completed' });
-      setSuccess('Task completed successfully');
-      setTimeout(() => router.back(), 1500);
+      const updatedTask = await updateTask(task.id, { completed: !task.completed });
+      setTask(updatedTask);
     } catch (error) {
-      setError('Failed to complete task');
+      console.error('Error updating task:', error);
     }
-  };
+  }, [task]);
 
-  const handleStartFocus = () => {
-    if (!task) return;
-    router.push({
-      pathname: '/focus',
-      params: { taskId: task.id }
-    });
-  };
-
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!task) return;
     try {
       await deleteTask(task.id);
-      setSuccess('Task deleted successfully');
-      setTimeout(() => router.back(), 1500);
+      router.back();
     } catch (error) {
-      setError('Failed to delete task');
+      console.error('Error deleting task:', error);
     }
-  };
+  }, [task, router]);
 
-  const handleEdit = () => {
+  const handleStartFocus = useCallback(() => {
     if (!task) return;
-    router.push({
-      pathname: '/tasks/edit',
-      params: { id: task.id }
-    });
-  };
+    router.push(`/(app)/focus?taskId=${task.id}`);
+  }, [task, router]);
 
-  if (loading) {
+  if (loading || !task) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
+      <ScreenLayout title="Task">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Loading...</Text>
+        </View>
+      </ScreenLayout>
     );
   }
-
-  if (!task) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-        <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 16 }}>
-          Task not found
-        </Text>
-        <Button mode="contained" onPress={() => router.back()}>
-          Go Back
-        </Button>
-      </View>
-    );
-  }
-
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-  };
-
-  const getDeadlineStatus = (deadline: string) => {
-    const now = new Date();
-    const deadlineDate = new Date(deadline);
-    
-    if (deadlineDate < now) {
-      return { text: 'Overdue', color: theme.colors.error };
-    }
-    
-    const diffTime = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffTime === 0) {
-      return { text: 'Due Today', color: theme.colors.warning };
-    }
-    if (diffTime === 1) {
-      return { text: 'Due Tomorrow', color: theme.colors.primary };
-    }
-    return { text: `Due ${formatDate(deadline)}`, color: theme.colors.primary };
-  };
 
   return (
-    <>
-      <View style={{ flex: 1, backgroundColor: 'white', padding: 16 }}>
-        <Animated.View 
-          entering={FadeIn}
-          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}
-        >
-          <Text variant="headlineMedium">{task.title}</Text>
-          <IconButton icon="pencil" onPress={handleEdit} />
-        </Animated.View>
-        
-        <Animated.View entering={FadeInDown.delay(100)}>
-          {task.description && (
-            <Text variant="bodyLarge" style={{ marginBottom: 24, color: '#666' }}>
+    <ScreenLayout
+      title={task.title}
+      action={
+        <IconButton 
+          icon="pencil" 
+          onPress={() => router.push(`/(app)/tasks/edit/${task.id}`)}
+        />
+      }
+    >
+      <ScrollView style={{ flex: 1 }}>
+        <View style={{ padding: 16 }}>
+          {/* Task Details */}
+          <View style={{ marginBottom: 24 }}>
+            <Text variant="bodyLarge" style={{ marginBottom: 16 }}>
               {task.description}
             </Text>
-          )}
 
-          <View style={{ marginBottom: 24 }}>
             <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-              <Text style={{ color: '#666', width: 80 }}>Priority:</Text>
-              <Text>{task.priority === 3 ? 'high' : task.priority === 2 ? 'medium' : 'low'}</Text>
+              <Text style={{ width: 80, color: theme.colors.outline }}>
+                Priority:
+              </Text>
+              <Text style={{ color: theme.colors.onSurface }}>
+                {task.priority}
+              </Text>
             </View>
 
             <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-              <Text style={{ color: '#666', width: 80 }}>Status:</Text>
-              <Text>{task.status}</Text>
+              <Text style={{ width: 80, color: theme.colors.outline }}>
+                Status:
+              </Text>
+              <Text style={{ color: theme.colors.onSurface }}>
+                {task.completed ? 'Completed' : 'Pending'}
+              </Text>
             </View>
 
             {task.deadline && (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ color: '#666', width: 80 }}>Deadline:</Text>
-                <Text style={{ color: getDeadlineStatus(task.deadline).color }}>
-                  {getDeadlineStatus(task.deadline).text}
+              <View style={{ flexDirection: 'row' }}>
+                <Text style={{ width: 80, color: theme.colors.outline }}>
+                  Due:
+                </Text>
+                <Text style={{ color: theme.colors.onSurface }}>
+                  {format(new Date(task.deadline), 'PPP')}
                 </Text>
               </View>
             )}
           </View>
-        </Animated.View>
 
-        <View style={{ flex: 1 }} />
+          <Divider style={{ marginVertical: 24 }} />
 
-        <Animated.View entering={FadeInDown.delay(200)}>
-          <Button
-            mode="contained"
-            onPress={() => setShowCompleteDialog(true)}
-            style={{
-              marginBottom: 12,
-              borderRadius: 8,
-              backgroundColor: theme.colors.primary,
-            }}
-            contentStyle={{ height: 48 }}
-          >
-            Mark Complete
-          </Button>
+          {/* Action Buttons */}
+          <View style={{ gap: 12 }}>
+            <Button 
+              mode="contained"
+              onPress={handleComplete}
+            >
+              Mark {task.completed ? 'Incomplete' : 'Complete'}
+            </Button>
 
-          <Button
-            mode="contained"
-            onPress={handleStartFocus}
-            icon="timer"
-            style={{
-              marginBottom: 12,
-              borderRadius: 8,
-              backgroundColor: theme.colors.primary,
-            }}
-            contentStyle={{ height: 48 }}
-          >
-            Start Focus Mode
-          </Button>
+            <Button 
+              mode="contained"
+              icon="timer"
+              onPress={handleStartFocus}
+              style={{ backgroundColor: theme.colors.secondary }}
+            >
+              Start Focus Mode
+            </Button>
 
-          <Button
-            mode="outlined"
-            onPress={() => setShowDeleteDialog(true)}
-            textColor={theme.colors.error}
-            style={{
-              borderRadius: 8,
-              borderColor: theme.colors.error,
-            }}
-            contentStyle={{ height: 48 }}
-          >
-            Delete Task
-          </Button>
-        </Animated.View>
-      </View>
-
-      {/* Delete Confirmation Dialog */}
-      <Portal>
-        <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
-          <Dialog.Title>Delete Task</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">
-              Are you sure you want to delete this task? This action cannot be undone.
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowDeleteDialog(false)}>Cancel</Button>
-            <Button textColor={theme.colors.error} onPress={handleDelete}>Delete</Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        <Dialog visible={showCompleteDialog} onDismiss={() => setShowCompleteDialog(false)}>
-          <Dialog.Title>Complete Task</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">
-              Mark this task as completed?
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowCompleteDialog(false)}>Cancel</Button>
-            <Button onPress={handleMarkComplete}>Complete</Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        <Snackbar
-          visible={!!error}
-          onDismiss={() => setError('')}
-          duration={3000}
-          style={{ backgroundColor: theme.colors.error }}
-        >
-          {error}
-        </Snackbar>
-
-        <Snackbar
-          visible={!!success}
-          onDismiss={() => setSuccess('')}
-          duration={3000}
-          style={{ backgroundColor: theme.colors.primary }}
-        >
-          {success}
-        </Snackbar>
-      </Portal>
-    </>
+            <Button 
+              mode="outlined"
+              textColor={theme.colors.error}
+              onPress={handleDelete}
+            >
+              Delete Task
+            </Button>
+          </View>
+        </View>
+      </ScrollView>
+    </ScreenLayout>
   );
 } 

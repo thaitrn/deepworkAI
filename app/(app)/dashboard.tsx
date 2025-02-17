@@ -1,5 +1,5 @@
-import { View, ScrollView, RefreshControl, Pressable, Keyboard, TouchableWithoutFeedback } from 'react-native';
-import { Fragment, useEffect } from 'react';
+import React, { Fragment, useEffect, useState, useMemo } from 'react';
+import { View, ScrollView, RefreshControl, Pressable, Keyboard, TouchableWithoutFeedback, Image } from 'react-native';
 import {
   Text,
   FAB,
@@ -13,7 +13,7 @@ import {
   TextInput,
   ProgressBar,
 } from 'react-native-paper';
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/auth';
 import { Task } from '@/types';
 import { getTasks } from '@/services/tasks';
@@ -21,19 +21,27 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { TaskItem } from '@/components/TaskItem';
 import Animated, { FadeIn, FadeInDown, withSpring, withTiming } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { EmptyState } from '@/components/EmptyState';
+import { BottomNavigation } from '@/components/BottomNavigation';
+import { Header } from '@/components/Header';
+import { SafeAreaWrapper } from '@/components/SafeAreaWrapper';
+import { TaskList } from '@/components/TaskList';
+import { SearchBar } from '@/components/SearchBar';
+import { ScreenLayout } from '@/components/ScreenLayout';
+import { isToday } from 'date-fns';
 
 type SortOption = 'created' | 'deadline' | 'priority';
 
-function SearchBar({
-                     value: searchQuery,
-                     onChangeText: setSearchQuery,
-                     onClear,
-                     onFilterChange,
-                     filteredTasksCount,
-                     pendingCount,
-                     completedCount,
-                     currentFilter,
-                   }: {
+function TaskSearchBar({
+  value: searchQuery,
+  onChangeText: setSearchQuery,
+  onClear,
+  onFilterChange,
+  filteredTasksCount,
+  pendingCount,
+  completedCount,
+  currentFilter,
+}: {
   value: string;
   onChangeText: (text: string) => void;
   onClear: () => void;
@@ -139,10 +147,10 @@ function SearchBar({
   );
 }
 
-export default function Dashboard() {
-  const { session } = useAuth();
-  const router = useRouter();
+export default function DashboardScreen() {
   const theme = useTheme();
+  const router = useRouter();
+  const { session } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -153,22 +161,23 @@ export default function Dashboard() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const isFirstLoad = useRef(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [hasMore, setHasMore] = useState(true);
 
   const loadTasks = useCallback(async (showLoading = true) => {
     if (!session?.user?.id) {
-      setLoading(false);
-      setRefreshing(false);
+      console.warn('No user ID available');
       return;
     }
-
+    
     try {
       if (showLoading) {
         setLoading(true);
       }
-      const data = await getTasks(session.user.id);
-      setTasks(data);
+      const fetchedTasks = await getTasks(session.user.id);
+      setTasks(fetchedTasks);
       setError('');
       setRetryCount(0);
+      setHasMore(fetchedTasks.length >= 10);
     } catch (error) {
       console.error('Error loading tasks:', error);
       setError('Failed to load tasks');
@@ -180,91 +189,39 @@ export default function Dashboard() {
       }
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      isFirstLoad.current = false;
     }
   }, [session?.user?.id, retryCount]);
 
   useEffect(() => {
-    if (!session?.user?.id) {
-      router.replace('/(auth)/login');
+    if (session?.user?.id) {
+      loadTasks();
     }
-  }, [session, router]);
+  }, [session?.user?.id, loadTasks]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (session?.user?.id) {
-        if (isFirstLoad.current) {
-          loadTasks(true);
-          isFirstLoad.current = false;
-        } else {
-          loadTasks(false);
-        }
-      }
-    }, [session, loadTasks])
-  );
-
-  const onRefresh = useCallback(() => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    loadTasks(false);
+    loadTasks(false).finally(() => {
+      setRefreshing(false);
+    });
   }, [loadTasks]);
 
-  const handleAddTask = () => {
-    router.push('/tasks/new');
-  };
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || loading || refreshing) return;
+    loadTasks(false);
+  }, [hasMore, loading, refreshing, loadTasks]);
 
-  const sortTasks = (tasksToSort: Task[]) => {
-    return [...tasksToSort].sort((a, b) => {
-      switch (sortBy) {
-        case 'deadline':
-          if (!a.deadline) return 1;
-          if (!b.deadline) return -1;
-          return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-        case 'priority':
-          return b.priority - a.priority;
-        default:
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      }
-    });
-  };
+  const handleTaskPress = useCallback((task: Task) => {
+    router.push(`/(app)/tasks/${task.id}`);
+  }, [router]);
 
-  const filteredAndSortedTasks = sortTasks(
-    tasks.filter(task =>
-      filter === 'pending' ? task.status !== 'completed' : task.status === 'completed'
-    )
-  );
-
-  // Calculate task statistics
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
-  const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-  const todaysTasks = tasks.filter(task => {
-    if (!task.deadline) return false;
-    const today = new Date();
-    const deadline = new Date(task.deadline);
-    return (
-      deadline.getDate() === today.getDate() &&
-      deadline.getMonth() === today.getMonth() &&
-      deadline.getFullYear() === today.getFullYear()
-    );
-  });
-
-  // Filter tasks based on search
-  const getFilteredTasks = useCallback(() => {
+  const todayTasks = useMemo(() => {
     return tasks.filter(task => {
-      const matchesSearch = searchQuery
-        ? task.title.toLowerCase().includes(searchQuery.toLowerCase())
-        : true;
-      const matchesStatus = filter === 'pending'
-        ? task.status !== 'completed'
-        : task.status === 'completed';
-      return matchesSearch && matchesStatus;
+      if (task.completed) return false;
+      if (!task.due_date) return true; // Tasks without due date show in Today
+      return isToday(new Date(task.due_date));
     });
-  }, [tasks, searchQuery, filter]);
-
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    // Optional: Reset any search-related state
-  };
+  }, [tasks]);
 
   if (loading && isFirstLoad.current) {
     return (
@@ -275,168 +232,36 @@ export default function Dashboard() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      {/* Header Section */}
-      <Surface style={{ elevation: 1, backgroundColor: theme.colors.surface }}>
-        <View style={{ padding: 16, paddingTop: 24 }}>
-          <View style={{ marginBottom: 24 }}>
-            <Text variant="titleLarge" style={{ fontWeight: 'bold', marginBottom: 4 }}>My Tasks</Text>
-            <Text variant="bodyMedium" style={{ color: theme.colors.outline }}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </Text>
-          </View>
-
-          {/* Replace existing search with new SearchBar */}
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onClear={handleClearSearch}
-            onFilterChange={setFilter}
-            filteredTasksCount={getFilteredTasks().length}
-            pendingCount={getFilteredTasks().filter(t => t.status !== 'completed').length}
-            completedCount={getFilteredTasks().filter(t => t.status === 'completed').length}
-            currentFilter={filter}
-          />
-
-          {/* Show stats only when not searching */}
-          {!searchQuery && (
-            <Fragment>
-              {/* Quick Stats */}
-              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-                <Surface style={{
-                  flex: 1,
-                  padding: 16,
-                  borderRadius: 12,
-                  backgroundColor: theme.colors.primaryContainer,
-                }}>
-                  <Text style={{ color: theme.colors.onPrimaryContainer, fontSize: 24, fontWeight: 'bold' }}>
-                    {todaysTasks.length}
-                  </Text>
-                  <Text style={{ color: theme.colors.onPrimaryContainer }}>Today's Tasks</Text>
-                </Surface>
-                <Surface style={{
-                  flex: 1,
-                  padding: 16,
-                  borderRadius: 12,
-                  backgroundColor: theme.colors.secondaryContainer,
-                }}>
-                  <Text style={{ color: theme.colors.onSecondaryContainer, fontSize: 24, fontWeight: 'bold' }}>
-                    {Math.round(completionRate)}%
-                  </Text>
-                  <Text style={{ color: theme.colors.onSecondaryContainer }}>Completion</Text>
-                </Surface>
-              </View>
-
-              {/* Filter Section */}
-              <FilterSection
-                filter={filter}
-                onFilterChange={setFilter}
-              />
-            </Fragment>
-          )}
-        </View>
-      </Surface>
-
-      {/* Tasks List */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[theme.colors.primary]}
-          />
-        }
-      >
-        {loading && !refreshing ? (
-          <View style={{ padding: 16, alignItems: 'center' }}>
-            <ActivityIndicator color={theme.colors.primary} />
-          </View>
-        ) : getFilteredTasks().length > 0 ? (
-          <Animated.View entering={FadeIn}>
-            {searchQuery ? (
-              // Search results view
-              <View>
-                <Text variant="titleMedium" style={{ marginBottom: 12, color: theme.colors.primary }}>
-                  Search Results
-                </Text>
-                {getFilteredTasks().map(task => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    onPress={() => router.push(`/tasks/${task.id}`)}
-                  />
-                ))}
-              </View>
-            ) : (
-              // Normal view with Today's and All Tasks
-              <>
-                {/* Today's Tasks */}
-                {todaysTasks.length > 0 && (
-                  <View style={{ marginBottom: 24 }}>
-                    <Text variant="titleMedium" style={{ marginBottom: 12, color: theme.colors.primary }}>
-                      Today's Tasks
-                    </Text>
-                    {todaysTasks.map(task => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        onPress={() => router.push(`/tasks/${task.id}`)}
-                      />
-                    ))}
-                  </View>
-                )}
-
-                {/* Other Tasks */}
-                <View>
-                  <Text variant="titleMedium" style={{ marginBottom: 12, color: theme.colors.primary }}>
-                    All Tasks
-                  </Text>
-                  {getFilteredTasks()
-                    .filter(task => !todaysTasks.includes(task))
-                    .map(task => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        onPress={() => router.push(`/tasks/${task.id}`)}
-                      />
-                    ))}
-                </View>
-              </>
-            )}
-          </Animated.View>
-        ) : (
-          <View style={{ padding: 24, alignItems: 'center', opacity: 0.7 }}>
-            <MaterialCommunityIcons
-              name="checkbox-blank-off-outline"
-              size={48}
-              color={theme.colors.outline}
-              style={{ marginBottom: 16 }}
-            />
-            <Text variant="titleMedium" style={{ marginBottom: 8, textAlign: 'center' }}>
-              No tasks found
-            </Text>
-            <Text variant="bodyMedium" style={{ color: theme.colors.outline, textAlign: 'center' }}>
-              {searchQuery
-                ? 'Try adjusting your search'
-                : filter === 'pending'
-                  ? 'Add a new task to get started'
-                  : 'Complete some tasks to see them here'}
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-
-      <FAB
-        icon="plus"
-        onPress={handleAddTask}
-        style={{
-          position: 'absolute',
-          right: 16,
-          bottom: 16,
-          backgroundColor: theme.colors.primary,
-        }}
+    <ScreenLayout
+      title="Today"
+      subtitle={new Date().toLocaleDateString('en-US', { 
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      })}
+      showSearch
+      fab={
+        <FAB
+          icon="plus"
+          onPress={() => router.push('/(app)/tasks/new')}
+          style={{
+            position: 'absolute',
+            right: 16,
+            bottom: 80,
+            backgroundColor: theme.colors.primary,
+          }}
+        />
+      }
+    >
+      <TaskList
+        tasks={todayTasks}
+        onTaskPress={handleTaskPress}
+        onLoadMore={handleLoadMore}
+        hasMore={hasMore}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        loading={loading && !refreshing}
+        emptyMessage="You're all done for today! 🎉"
       />
 
       <Snackbar
@@ -449,7 +274,7 @@ export default function Dashboard() {
       >
         {error}
       </Snackbar>
-    </View>
+    </ScreenLayout>
   );
 }
 

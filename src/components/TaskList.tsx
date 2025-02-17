@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { FlatList, ListRenderItem, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Text, ActivityIndicator, useTheme } from 'react-native-paper';
 import { Task } from '@/types';
 import { TaskItem } from './TaskItem';
 
@@ -9,15 +9,44 @@ interface Props {
   onTaskPress: (task: Task) => void;
   onLoadMore: () => void;
   hasMore: boolean;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  loading?: boolean;
+  emptyMessage?: string;
+  ListHeaderComponent?: React.ReactNode;
 }
 
-const TaskList = memo(({ tasks, onTaskPress, onLoadMore, hasMore }: Props) => {
+export const TaskList = memo(({ 
+  tasks, 
+  onTaskPress, 
+  onLoadMore, 
+  hasMore,
+  refreshing,
+  onRefresh,
+  loading,
+  emptyMessage = 'No tasks yet',
+  ListHeaderComponent
+}: Props) => {
+  const theme = useTheme();
+
   const renderItem: ListRenderItem<Task> = ({ item }) => (
     <TaskItem task={item} onPress={() => onTaskPress(item)} />
   );
 
+  if (loading) {
+    return (
+      <View style={{ padding: 24, alignItems: 'center' }}>
+        <ActivityIndicator color={theme.colors.primary} />
+      </View>
+    );
+  }
+
   if (!tasks.length) {
-    return null;
+    return (
+      <View style={{ alignItems: 'center', padding: 24 }}>
+        <Text style={{ color: theme.colors.outline }}>{emptyMessage}</Text>
+      </View>
+    );
   }
 
   return (
@@ -27,12 +56,16 @@ const TaskList = memo(({ tasks, onTaskPress, onLoadMore, hasMore }: Props) => {
       keyExtractor={item => item.id}
       onEndReached={hasMore ? onLoadMore : undefined}
       onEndReachedThreshold={0.5}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      ListHeaderComponent={ListHeaderComponent}
       initialNumToRender={10}
       maxToRenderPerBatch={10}
       windowSize={5}
-      contentContainerStyle={{ paddingBottom: 16 }}
+      contentContainerStyle={{ 
+        paddingHorizontal: 16,
+        paddingBottom: 16 
+      }}
     />
   );
-});
-
-export default TaskList; 
+}); 
