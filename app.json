@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "deeepworkAI",
-    "slug": "deeepworkAI",
+    "slug": "deepworkai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,18 +15,41 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.deeepworkAI"
+      "bundleIdentifier": "com.thaitrn.deepworkai",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.deeepworkAI"
+      "package": "com.thaitrn.deepworkai"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
       "expo-splash-screen"
-    ]
+    ],
+    "scheme": "deepworkai",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "f99f4c58-072e-4cad-ab19-1d5bf435275a"
+      }
+    },
+    "owner": "thaitrn",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f99f4c58-072e-4cad-ab19-1d5bf435275a"
+    }
   }
 }

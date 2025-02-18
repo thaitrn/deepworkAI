@@ -9,7 +9,11 @@
     "web": "expo start --web",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\""
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
+    "deploy:preview": "eas update --branch preview",
+    "deploy:production": "eas update --branch production",
+    "build:preview": "eas build --profile preview",
+    "build:production": "eas build --profile production"
   },
   "dependencies": {
     "@motify/components": "^0.18.0",
